@@ -99,7 +99,8 @@ func main() {
 			ArgsUsage: "[group]",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name: "watch, w",
+					Name:  "watch, w",
+					Usage: "Persistently refresh the results to get a live feed of updates",
 				},
 			},
 			Action: view,
