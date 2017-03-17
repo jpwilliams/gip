@@ -64,6 +64,13 @@ func main() {
 	app.Name = "gip"
 	app.Usage = "List git commits across grouped repositories within a given time period"
 
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "fetch",
+			Usage: "Fetch remotes from repositories before displaying",
+		},
+	}
+
 	app.Commands = []cli.Command{
 		{
 			Name:    "group",
