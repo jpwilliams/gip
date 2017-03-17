@@ -1,7 +1,6 @@
 package main
 
 import (
-	// "errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	// "time"
 
 	"github.com/gosuri/uiprogress"
 	"github.com/jinzhu/configor"
