@@ -102,6 +102,15 @@ func main() {
 					Name:  "watch, w",
 					Usage: "Persistently refresh the results to get a live feed of updates",
 				},
+				cli.StringFlag{
+					Name:  "after, a",
+					Value: "12am",
+					Usage: "Specify a 'git log'-compatible time period to list commits since",
+				},
+				cli.StringFlag{
+					Name:  "before, b",
+					Usage: "Specify a 'git log'-compatible time period to list commits until",
+				},
 			},
 			Action: view,
 		}, {
@@ -114,20 +123,25 @@ func main() {
 	app.Run(os.Args)
 }
 
-func getLog(bar *uiprogress.Bar, name string, path string, waiter *sync.WaitGroup, ret chan string) {
+func getLog(bar *uiprogress.Bar, name string, path string, after string, before string, waiter *sync.WaitGroup, ret chan string) {
 	defer waiter.Done()
 	defer bar.Incr()
 
-	cmd := exec.Command(
-		"git",
+	cmdStr := []string{
 		"--no-pager",
 		"log",
 		"--all",
-		"--pretty=%ct %cd %CblueNAME%Creset%Cgreen %s%Creset %Cred%d%Creset - %an",
-		"--since=\"12am\"",
-		"--reverse",
 		"--date=format:%a %R",
-	)
+		"--pretty=%ct %cd %CblueNAME%Creset%Cgreen %s%Creset %Cred%d%Creset - %an",
+		"--reverse",
+		"--after=" + after,
+	}
+
+	if before != "" {
+		cmdStr = append(cmdStr, "--before="+before)
+	}
+
+	cmd := exec.Command("git", cmdStr...)
 	cmd.Dir = path
 	emojify := exec.Command("emojify")
 
@@ -155,12 +169,12 @@ func view(c *cli.Context) error {
 		return nil
 	}
 
-	viewLogs(c.Args().First(), false)
+	viewLogs(c.Args().First(), false, c.String("after"), c.String("before"))
 
 	return nil
 }
 
-func viewLogs(repo string, clear bool) {
+func viewLogs(repo string, clear bool, after string, before string) {
 	repos := config.Groups[repo].Repos
 	retChan := make(chan string, 500)
 	waiter := &sync.WaitGroup{}
@@ -176,7 +190,7 @@ func viewLogs(repo string, clear bool) {
 
 	for _, repo := range repos {
 		waiter.Add(1)
-		go getLog(bar, repo, config.Repos[repo].Path, waiter, retChan)
+		go getLog(bar, repo, config.Repos[repo].Path, after, before, waiter, retChan)
 	}
 
 	waiter.Wait()
