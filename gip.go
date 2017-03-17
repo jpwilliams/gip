@@ -116,6 +116,19 @@ func main() {
 			Name:    "repo",
 			Aliases: []string{"r"},
 			Usage:   "Manage repositories",
+			Subcommands: []cli.Command{
+				{
+					Name:      "list",
+					Usage:     "List repositories",
+					ArgsUsage: "[group]",
+					Action:    listRepos,
+				}, {
+					Name:      "remove",
+					Usage:     "Delete a repository",
+					ArgsUsage: "[repo]",
+					Action:    deleteRepo,
+				},
+			},
 		}, {
 			Name:      "view",
 			Aliases:   []string{"v, vg"},
@@ -150,6 +163,67 @@ func main() {
 	}
 
 	app.Run(os.Args)
+}
+
+func deleteRepo(c *cli.Context) error {
+	wantedRepo := c.Args().First()
+
+	if wantedRepo == "" {
+		fmt.Println("You must specify a repository to delete")
+		return nil
+	}
+
+	if _, ok := config.Repos[wantedRepo]; !ok {
+		fmt.Println("Could not find repo")
+		return nil
+	}
+
+	repo := config.Repos[wantedRepo]
+	groups := repo.Groups
+	delete(config.Repos, wantedRepo)
+
+	for _, group := range groups {
+		rl := config.Groups[group].Repos
+
+		for i, repo := range rl {
+			if repo == wantedRepo {
+				rl = append(rl[:i], rl[i+1:]...)
+				break
+			}
+		}
+	}
+
+	fmt.Println(config)
+
+	return nil
+}
+
+func listGroups(c *cli.Context) error {
+	table := uitable.New()
+	table.Wrap = true
+	table.AddRow("NAME", "REPOS")
+
+	for name, group := range config.Groups {
+		table.AddRow(name, len(group.Repos))
+	}
+
+	fmt.Println(table)
+
+	return nil
+}
+
+func listRepos(c *cli.Context) error {
+	table := uitable.New()
+	table.Wrap = true
+	table.AddRow("NAME", "GROUPS", "PATH")
+
+	for name, repo := range config.Repos {
+		table.AddRow(name, strings.Join(repo.Groups, ", "), repo.Path)
+	}
+
+	fmt.Println(table)
+
+	return nil
 }
 
 func getLog(bar *uiprogress.Bar, name string, path string, after string, before string, waiter *sync.WaitGroup, ret chan Log) {
