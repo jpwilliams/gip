@@ -10,8 +10,11 @@ import (
 	"sync"
 
 	"github.com/gosuri/uiprogress"
+	"github.com/gosuri/uitable"
 	"github.com/jinzhu/configor"
+	"github.com/olekukonko/tablewriter"
 	"github.com/urfave/cli"
+	terminal "github.com/wayneashleyberry/terminal-dimensions"
 )
 
 type Config struct {
@@ -28,10 +31,27 @@ type Repo struct {
 	Groups []string
 }
 
+type Log struct {
+	Timestamp string
+	Time      string
+	Repo      string
+	Message   string
+	Author    string
+	Details   string
+	Sign      string
+}
+
+type byTimestamp []Log
+
+func (c byTimestamp) Len() int           { return len(c) }
+func (c byTimestamp) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
+func (c byTimestamp) Less(i, j int) bool { return c[i].Timestamp <= c[j].Timestamp }
+
 var config Config
 
 func main() {
-	configor.Load(&config, "/Users/jackwilliams/.gip.json")
+	configPath := "/Users/jackwilliams/.gip.json"
+	configor.Load(&config, configPath)
 
 	app := cli.NewApp()
 	app.Version = "0.0.0"
@@ -58,11 +78,9 @@ func main() {
 						return nil
 					},
 				}, {
-					Name:  "list",
-					Usage: "List groups",
-					Action: func(c *cli.Context) error {
-						return nil
-					},
+					Name:   "list",
+					Usage:  "List groups",
+					Action: listGroups,
 				}, {
 					Name:      "add",
 					Usage:     "Add a repository to a group",
@@ -109,6 +127,11 @@ func main() {
 					Name:  "before, b",
 					Usage: "Specify a 'git log'-compatible time period to list commits until",
 				},
+				cli.IntFlag{
+					Name:  "n",
+					Usage: "Maximum number of logs to return",
+					Value: 0,
+				},
 			},
 			Action: view,
 		}, {
@@ -121,7 +144,7 @@ func main() {
 	app.Run(os.Args)
 }
 
-func getLog(bar *uiprogress.Bar, name string, path string, after string, before string, waiter *sync.WaitGroup, ret chan string) {
+func getLog(bar *uiprogress.Bar, name string, path string, after string, before string, waiter *sync.WaitGroup, ret chan Log) {
 	defer waiter.Done()
 	defer bar.Incr()
 
@@ -130,7 +153,7 @@ func getLog(bar *uiprogress.Bar, name string, path string, after string, before 
 		"log",
 		"--all",
 		"--date=format:%a %R",
-		"--pretty=%ct %cd %CblueNAME%Creset%Cgreen %s%Creset %Cred%d%Creset - %an",
+		"--pretty=%ct ||| %cd ||| %s ||| %an ||| %G? ||| %d",
 		"--reverse",
 		"--after=" + after,
 	}
@@ -155,7 +178,25 @@ func getLog(bar *uiprogress.Bar, name string, path string, after string, before 
 	}
 
 	for _, line := range lines {
-		parsed := strings.Replace(line, "NAME", name+" -", 1)
+		split := strings.Split(line, " ||| ")
+
+		if len(split) < 4 {
+			continue
+		}
+
+		parsed := Log{
+			Timestamp: split[0],
+			Time:      split[1],
+			Repo:      name,
+			Message:   split[2],
+			Author:    split[3],
+			Sign:      split[4],
+		}
+
+		if len(split) == 6 {
+			parsed.Details = split[5]
+		}
+
 		ret <- parsed
 	}
 }
@@ -167,14 +208,14 @@ func view(c *cli.Context) error {
 		return nil
 	}
 
-	viewLogs(c.Args().First(), false, c.String("after"), c.String("before"))
+	viewLogs(c.Args().First(), false, c.String("after"), c.String("before"), c.Int("n"))
 
 	return nil
 }
 
-func viewLogs(repo string, clear bool, after string, before string) {
+func viewLogs(repo string, clear bool, after string, before string, max int) {
 	repos := config.Groups[repo].Repos
-	retChan := make(chan string, 500)
+	retChan := make(chan Log, 500)
 	waiter := &sync.WaitGroup{}
 
 	uiprogress.Start()
@@ -194,23 +235,30 @@ func viewLogs(repo string, clear bool, after string, before string) {
 	waiter.Wait()
 	close(retChan)
 	uiprogress.Stop()
-	var logs []string
+	var logs []Log
 
 	for line := range retChan {
 		logs = append(logs, line)
 	}
 
-	sort.Strings(logs)
+	sort.Sort(byTimestamp(logs))
 
-	if clear {
-		clr := exec.Command("clear")
-		clr.Stdout = os.Stdout
-		clr.Run()
-		clr.Wait()
-		fmt.Println("cleared")
+	if max > 0 {
+		logs = logs[max:]
 	}
 
-	for _, line := range logs {
-		fmt.Println(line[11:])
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Time", "Repo", "Author", "Commit"})
+	table.SetBorders(tablewriter.Border{Left: false, Top: false, Right: false, Bottom: false})
+	table.SetCenterSeparator("|")
+	termWidth, _ := terminal.Width()
+	table.SetColWidth(int(termWidth))
+
+	for _, log := range logs {
+		table.Append([]string{log.Time, log.Repo, log.Author + " (" + log.Sign + ")", log.Message})
+	}
+
+	table.Render()
+}
 	}
 }
