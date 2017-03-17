@@ -35,8 +35,6 @@ var config Config
 func main() {
 	configor.Load(&config, "/Users/jackwilliams/.gip.json")
 
-	var bob string
-
 	app := cli.NewApp()
 	app.Version = "0.0.0"
 	app.Authors = []cli.Author{
@@ -47,15 +45,6 @@ func main() {
 	}
 	app.Name = "gip"
 	app.Usage = "List git commits across grouped repositories within a given time period"
-
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:        "bob",
-			Value:       "flam",
-			Usage:       "Test flag is here",
-			Destination: &bob,
-		},
-	}
 
 	app.Commands = []cli.Command{
 		{
