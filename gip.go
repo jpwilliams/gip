@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -267,5 +268,15 @@ func viewLogs(repo string, clear bool, after string, before string, max int) {
 
 	table.Render()
 }
+
+func SaveJsonFile(v interface{}, path string) {
+	fo, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
+	defer fo.Close()
+	e := json.NewEncoder(fo)
+	if err := e.Encode(v); err != nil {
+		panic(err)
 	}
 }
