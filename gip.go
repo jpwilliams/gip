@@ -326,7 +326,7 @@ func viewLogs(repo string, clear bool, after string, before string, max int) {
 	sort.Sort(byTimestamp(logs))
 
 	if max > 0 {
-		logs = logs[max:]
+		logs = logs[len(logs)-max:]
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
