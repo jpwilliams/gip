@@ -321,7 +321,17 @@ func viewLogs(repo string, after string, before string, max int, fetch bool) {
 	table.SetColWidth(5000)
 
 	for _, log := range logs {
-		table.Append([]string{log.Time, log.Repo, log.Author + " (" + log.Sign + ")", log.Message})
+		author := log.Author
+		if log.Sign != "N" {
+			author += " (" + log.Sign + ")"
+		}
+
+		table.Append([]string{
+			log.Time,
+			log.Repo,
+			author,
+			log.Message,
+		})
 	}
 
 	table.Render()
