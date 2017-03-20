@@ -6,16 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/gosuri/uiprogress"
 	"github.com/gosuri/uitable"
 	"github.com/jinzhu/configor"
 	"github.com/olekukonko/tablewriter"
 	"github.com/urfave/cli"
-	terminal "github.com/wayneashleyberry/terminal-dimensions"
 )
 
 type Config struct {
@@ -226,9 +223,8 @@ func listRepos(c *cli.Context) error {
 	return nil
 }
 
-func getLog(bar *uiprogress.Bar, name string, path string, after string, before string, waiter *sync.WaitGroup, ret chan Log) {
+func getLog(name string, path string, after string, before string, waiter *sync.WaitGroup, ret chan Log) {
 	defer waiter.Done()
-	defer bar.Incr()
 
 	cmdStr := []string{
 		"--no-pager",
@@ -290,33 +286,23 @@ func view(c *cli.Context) error {
 		return nil
 	}
 
-	viewLogs(c.Args().First(), false, c.String("after"), c.String("before"), c.Int("n"))
+	viewLogs(c.Args().First(), c.String("after"), c.String("before"), c.Int("n"), false)
 
 	return nil
 }
 
-func viewLogs(repo string, clear bool, after string, before string, max int) {
+func viewLogs(repo string, after string, before string, max int, fetch bool) {
 	repos := config.Groups[repo].Repos
 	retChan := make(chan Log, 500)
 	waiter := &sync.WaitGroup{}
 
-	uiprogress.Start()
-	bar := uiprogress.AddBar(len(repos))
-	bar.AppendCompleted()
-	bar.PrependElapsed()
-
-	bar.PrependFunc(func(b *uiprogress.Bar) string {
-		return "(" + strconv.Itoa(b.Current()) + "/" + strconv.Itoa(len(repos)) + ")"
-	})
-
 	for _, repo := range repos {
 		waiter.Add(1)
-		go getLog(bar, repo, config.Repos[repo].Path, after, before, waiter, retChan)
+		go getLog(repo, config.Repos[repo].Path, after, before, waiter, retChan)
 	}
 
 	waiter.Wait()
 	close(retChan)
-	uiprogress.Stop()
 	var logs []Log
 
 	for line := range retChan {
@@ -330,11 +316,9 @@ func viewLogs(repo string, clear bool, after string, before string, max int) {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Time", "Repo", "Author", "Commit"})
 	table.SetBorders(tablewriter.Border{Left: false, Top: false, Right: false, Bottom: false})
 	table.SetCenterSeparator("|")
-	termWidth, _ := terminal.Width()
-	table.SetColWidth(int(termWidth))
+	table.SetColWidth(5000)
 
 	for _, log := range logs {
 		table.Append([]string{log.Time, log.Repo, log.Author + " (" + log.Sign + ")", log.Message})
