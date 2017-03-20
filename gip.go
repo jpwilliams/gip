@@ -231,7 +231,7 @@ func getLog(name string, path string, after string, before string, waiter *sync.
 		"log",
 		"--all",
 		"--date=format:%a %R",
-		"--pretty=%ct ||| %cd ||| %s ||| %an ||| %G? ||| %d",
+		"--pretty=%ct ||| %cd ||| %s ||| %an ||| %G? ||| %D",
 		"--reverse",
 		"--after=" + after,
 	}
